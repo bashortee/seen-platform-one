@@ -27,6 +27,7 @@ import {
 import { formatNumber } from '@/lib/cn'
 import { usePreferences } from '@/lib/preferences'
 import { useDemoData } from '@/lib/useDemoData'
+import { ArtistProfiles } from '@/components/ArtistProfiles'
 
 export const Route = createFileRoute('/app/')({
   head: () => ({ meta: [{ title: 'Dashboard — SEEN' }] }),
@@ -55,6 +56,7 @@ function Dashboard() {
 
   return (
     <>
+          <ArtistProfiles />
       <PageHeader
         eyebrow={role ? roleIntro[role] : 'Dashboard'}
         title={displayName ? `Good to see you, ${displayName.split(' ')[0]}.` : `${demoArtist.name}, this week.`}
