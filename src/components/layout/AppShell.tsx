@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useRouterState } from '@tanstack/react-router'
-import { ChevronsUpDown, FlaskConical, Menu, Unplug, X } from 'lucide-react'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { ChevronsUpDown, FlaskConical, LogOut, Menu, Unplug, X } from 'lucide-react'
 import { Logo } from '@/components/ui/Misc'
 import { cn } from '@/lib/cn'
 import { roleLabels, setPreferences, usePreferences } from '@/lib/preferences'
 import { demoArtist, demoRoster } from '@/data/demo'
 import { navGroups, settingsItem } from './nav'
+import { supabase } from '@/lib/supabase'
 
 const navItems = navGroups.flatMap((g) => [...g.items])
 
@@ -75,10 +76,55 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   )
 }
 
+
 function Sidebar({ pathname }: { pathname: string }) {
   const { role, displayName } = usePreferences()
+  const navigate = useNavigate()
+  const [signedIn, setSignedIn] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setSignedIn(Boolean(data.session))
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignedIn(Boolean(session))
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
   const isActive = (to: string, exact?: boolean) =>
     exact ? pathname === to || pathname === `${to}/` : pathname.startsWith(to)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    setSignOutError('')
+
+    try {
+      const { error } = await supabase.auth.signOut()
+
+      if (error) {
+        setSignOutError('Unable to sign out. Please try again.')
+        return
+      }
+
+      await navigate({ to: '/sign-in' })
+    } catch {
+      setSignOutError('Unable to sign out. Please try again.')
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -95,6 +141,7 @@ function Sidebar({ pathname }: { pathname: string }) {
           {navItems.map((item) => {
             const active = isActive(item.to, 'exact' in item ? item.exact : false)
             const Icon = item.icon
+
             return (
               <li key={item.to}>
                 <Link
@@ -128,19 +175,42 @@ function Sidebar({ pathname }: { pathname: string }) {
           <settingsItem.icon className="h-4 w-4" aria-hidden />
           {settingsItem.label}
         </Link>
+
         <div className="mt-2 flex items-center gap-3 rounded-xl px-3 py-2">
           <div className="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-xs font-medium text-fg-2">
             {(displayName || 'Guest').slice(0, 1).toUpperCase()}
           </div>
+
           <div className="min-w-0 text-xs">
             <p className="truncate text-fg">{displayName || 'Guest preview'}</p>
-            <p className="text-fg-3">{role ? roleLabels[role] : 'No role chosen'} · not signed in</p>
+            <p className="text-fg-3">
+              {role ? roleLabels[role] : 'No role chosen'} · {signedIn ? 'Signed in' : 'Guest preview'}
+            </p>
           </div>
         </div>
+
+        {signedIn && (
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg-3 transition-colors hover:bg-white/[0.04] hover:text-fg disabled:opacity-50"
+          >
+            <LogOut className="h-4 w-4" aria-hidden />
+            {signingOut ? 'Signing out...' : 'Sign out'}
+          </button>
+        )}
+
+        {signOutError && (
+          <p role="alert" className="px-3 py-1 text-xs text-critical">
+            {signOutError}
+          </p>
+        )}
       </div>
     </div>
   )
 }
+
 
 function WorkspaceSwitcher() {
   const { role } = usePreferences()
