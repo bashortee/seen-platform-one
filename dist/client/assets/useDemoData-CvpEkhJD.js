@@ -1,1 +1,0 @@
-import{r as o}from"./index-D2al2hXh.js";import{u as n}from"./preferences-C9Iw87t2.js";function c(s="default",t=550){const{showDemoData:e}=n(),[u,r]=o.useState(!0);return o.useEffect(()=>{if(!e)return;r(!0);const a=window.setTimeout(()=>r(!1),t);return()=>window.clearTimeout(a)},[s,t,e]),e?u?"loading":"ready":"off"}export{c as u};
