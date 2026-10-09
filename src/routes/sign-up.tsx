@@ -1,9 +1,11 @@
+
 import { useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
-import { AuthLayout, PreviewNotice } from '@/components/layout/AuthLayout'
+import { AuthLayout } from '@/components/layout/AuthLayout'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/Field'
+import { supabase } from '@/lib/supabase'
 import { setPreferences } from '@/lib/preferences'
 import { validateEmail, validatePassword } from '@/lib/validation'
 
@@ -16,22 +18,65 @@ type Errors = Partial<Record<'name' | 'email' | 'password' | 'terms', string>>
 
 function SignUp() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ name: '', email: '', password: '', terms: false })
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    terms: false,
+  })
   const [errors, setErrors] = useState<Errors>({})
-  const [submitted, setSubmitted] = useState(false)
+  const [message, setMessage] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setMessage('')
+    setAuthError('')
+
     const next: Errors = {
       name: form.name.trim() ? undefined : 'Enter your name or artist name.',
       email: validateEmail(form.email),
       password: validatePassword(form.password),
-      terms: form.terms ? undefined : 'Please accept the preview terms to continue.',
+      terms: form.terms ? undefined : 'Please confirm you understand the early-access status.',
     }
+
     setErrors(next)
+
     if (Object.values(next).some(Boolean)) return
-    setPreferences({ displayName: form.name.trim() })
-    setSubmitted(true)
+
+    setSubmitting(true)
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: form.email.trim(),
+        password: form.password,
+        options: {
+          data: {
+            display_name: form.name.trim(),
+          },
+        },
+      })
+
+      if (error) {
+        setAuthError(error.message)
+        return
+      }
+
+      setPreferences({ displayName: form.name.trim() })
+
+      if (data.session) {
+        await navigate({ to: '/onboarding' })
+      } else {
+        setMessage(
+          'Registration submitted. Check your email for a confirmation link before signing in.'
+        )
+      }
+    } catch {
+      setAuthError('Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -41,31 +86,37 @@ function SignUp() {
           <p className="font-display text-4xl leading-[1.1] tracking-tight">
             “The point isn't more charts. It's knowing which three things to do this week.”
           </p>
-          <footer className="mt-6 text-sm text-fg-3">The idea behind SEEN</footer>
+          <footer className="mt-6 text-sm text-fg-3">
+            The idea behind SEEN
+          </footer>
         </blockquote>
       }
     >
-      <h1 className="font-display text-4xl tracking-tight">Create your workspace</h1>
+      <h1 className="font-display text-4xl tracking-tight">
+        Create your workspace
+      </h1>
+
       <p className="mt-2 text-sm text-fg-2">
         Already have one?{' '}
-        <Link to="/sign-in" className="text-fg underline decoration-white/20 underline-offset-4 hover:decoration-signal">
+        <Link
+          to="/sign-in"
+          className="text-fg underline decoration-white/20 underline-offset-4 hover:decoration-signal"
+        >
           Sign in
         </Link>
       </p>
 
-      {submitted ? (
-        <div className="mt-8">
-          <PreviewNotice
-            title="Accounts aren't live yet"
-            action={
-              <Button onClick={() => navigate({ to: '/onboarding' })}>
-                Continue to onboarding <ArrowRight className="h-4 w-4" aria-hidden />
-              </Button>
-            }
+      {message ? (
+        <div className="mt-8 space-y-4">
+          <p role="status" className="text-sm text-fg-2">
+            {message}
+          </p>
+          <Link
+            to="/sign-in"
+            className="inline-flex items-center gap-2 text-sm text-fg underline underline-offset-4"
           >
-            SEEN is in early preview, so no account was created and your email and password were not
-            sent anywhere. Only your name is kept in this browser to personalise the demo.
-          </PreviewNotice>
+            Go to sign in <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
         </div>
       ) : (
         <form noValidate onSubmit={onSubmit} className="mt-8 space-y-4">
@@ -76,6 +127,7 @@ function SignUp() {
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             error={errors.name}
           />
+
           <TextField
             label="Email"
             type="email"
@@ -84,6 +136,7 @@ function SignUp() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             error={errors.email}
           />
+
           <TextField
             label="Password"
             type="password"
@@ -93,21 +146,40 @@ function SignUp() {
             error={errors.password}
             hint="At least 8 characters."
           />
+
           <div>
             <label className="flex items-start gap-3 text-sm text-fg-2">
               <input
                 type="checkbox"
                 checked={form.terms}
-                onChange={(e) => setForm({ ...form, terms: e.target.checked })}
+                onChange={(e) =>
+                  setForm({ ...form, terms: e.target.checked })
+                }
                 aria-invalid={errors.terms ? true : undefined}
                 className="mt-0.5 h-4 w-4 rounded accent-[#2f6fed]"
               />
-              I understand SEEN is an early preview that uses demo data.
+              I understand SEEN is in early access and some analytics may use demo data.
             </label>
-            {errors.terms && <p className="mt-1.5 text-xs text-critical">{errors.terms}</p>}
+            {errors.terms && (
+              <p className="mt-1.5 text-xs text-critical">
+                {errors.terms}
+              </p>
+            )}
           </div>
-          <Button type="submit" size="lg" className="w-full">
-            Create workspace
+
+          {authError && (
+            <p role="alert" className="text-sm text-critical">
+              {authError}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={submitting}
+          >
+            {submitting ? 'Creating account...' : 'Create workspace'}
           </Button>
         </form>
       )}
