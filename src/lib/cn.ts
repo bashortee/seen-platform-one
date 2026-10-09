@@ -1,0 +1,14 @@
+export function cn(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(' ')
+}
+
+export function formatNumber(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`
+  return n.toLocaleString('en-GB')
+}
+
+export function formatDelta(pct: number) {
+  const sign = pct > 0 ? '+' : pct < 0 ? '−' : ''
+  return `${sign}${Math.abs(pct).toFixed(1)}%`
+}
