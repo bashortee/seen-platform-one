@@ -8,7 +8,11 @@ export const Route = createFileRoute('/app')({
     <AppShell>
       <ErrorState
         title="This page couldn't be displayed"
-        description={error.message || 'An unexpected error occurred in the interface.'}
+        description={
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred in the interface.'
+        }
         onRetry={reset}
       />
     </AppShell>
