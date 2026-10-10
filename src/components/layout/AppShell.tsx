@@ -4,7 +4,8 @@ import { ChevronsUpDown, FlaskConical, LogOut, Menu, Unplug, X } from 'lucide-re
 import { Logo } from '@/components/ui/Misc'
 import { cn } from '@/lib/cn'
 import { roleLabels, setPreferences, usePreferences } from '@/lib/preferences'
-import { demoArtist, demoRoster } from '@/data/demo'
+import { getArtists, type Artist } from '@/services/artists'
+
 import { navGroups, settingsItem } from './nav'
 import { supabase } from '@/lib/supabase'
 
@@ -212,37 +213,123 @@ function Sidebar({ pathname }: { pathname: string }) {
 }
 
 
+
 function WorkspaceSwitcher() {
-  const { role } = usePreferences()
-  const multi = role === 'manager' || role === 'label'
-  const [selected, setSelected] = useState(demoRoster[0].id)
+  const { selectedArtistId } = usePreferences()
+  const [artists, setArtists] = useState<Artist[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    async function loadArtists() {
+      setLoading(true)
+      setError('')
+
+      try {
+        const profiles = await getArtists()
+        if (!active) return
+
+        const realArtists = profiles.filter(
+          (artist) => !artist.is_demo,
+        )
+
+        setArtists(realArtists)
+
+        if (
+          !realArtists.some(
+            (artist) => artist.id === selectedArtistId,
+          )
+        ) {
+          setPreferences({
+            selectedArtistId: realArtists[0]?.id ?? '',
+          })
+        }
+      } catch {
+        if (active) {
+          setError('Could not load artist profiles.')
+        }
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadArtists()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void loadArtists()
+    })
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
+  }, [selectedArtistId])
+
+  const selectedArtist = artists.find(
+    (artist) => artist.id === selectedArtistId,
+  )
 
   return (
     <div className="mx-3 rounded-lg border border-white/[0.07] bg-ink-900 px-3 py-2.5">
       <p className="text-[11px] text-fg-3">
-        {multi ? (role === 'label' ? 'Label roster' : 'Managed artists') : 'Artist workspace'}
+        Artist workspace
       </p>
-      {multi ? (
+
+      {loading ? (
+        <p className="mt-1.5 text-sm text-fg-3">
+          Loading artists...
+        </p>
+      ) : error ? (
+        <p className="mt-1.5 text-xs text-critical">
+          {error}
+        </p>
+      ) : artists.length === 0 ? (
+        <p className="mt-1.5 text-sm text-fg-3">
+          No artist profiles yet
+        </p>
+      ) : (
         <div className="relative mt-1.5">
-          <label htmlFor="roster" className="sr-only">Select artist</label>
+          <label htmlFor="roster" className="sr-only">
+            Select artist
+          </label>
+
           <select
             id="roster"
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
+            value={selectedArtist?.id ?? ''}
+            onChange={(event) =>
+              setPreferences({
+                selectedArtistId: event.target.value,
+              })
+            }
             className="w-full appearance-none bg-transparent pr-6 text-sm font-medium text-fg focus:outline-none"
           >
-            {demoRoster.map((a) => (
-              <option key={a.id} value={a.id} className="bg-ink-900">
-                {a.name}
+            {artists.map((artist) => (
+              <option
+                key={artist.id}
+                value={artist.id}
+                className="bg-ink-900"
+              >
+                {artist.artist_name}
               </option>
             ))}
           </select>
-          <ChevronsUpDown className="pointer-events-none absolute top-0.5 right-0 h-4 w-4 text-fg-3" aria-hidden />
+
+          <ChevronsUpDown
+            className="pointer-events-none absolute top-0.5 right-0 h-4 w-4 text-fg-3"
+            aria-hidden
+          />
         </div>
-      ) : (
-        <p className="mt-1.5 text-sm font-medium text-fg">{demoArtist.name}</p>
       )}
-      <p className="mt-1 text-[11px] text-fg-3">Fictional demo artist</p>
+
+      <p className="mt-1 text-[11px] text-fg-3">
+        {selectedArtist
+          ? 'Your artist profile'
+          : 'Select an artist profile'}
+      </p>
     </div>
   )
 }

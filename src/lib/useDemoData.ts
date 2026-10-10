@@ -1,24 +1,30 @@
+
 import { useEffect, useState } from 'react'
-import { usePreferences } from './preferences'
+import { usePreferences, usePreferencesHydrated } from './preferences'
 
 export type DemoStatus = 'loading' | 'ready' | 'off'
 
 /**
- * Drives the loading → ready lifecycle of demo panels and respects the
- * "Show demo data" preference. When real connections exist this hook is the
- * seam where actual fetching replaces the short local delay.
+ * Waits for saved preferences to load before showing demo content.
+ * Respects the "Show demo data" preference and simulates panel loading.
  */
 export function useDemoData(key: unknown = 'default', delay = 550): DemoStatus {
+  const isHydrated = usePreferencesHydrated()
   const { showDemoData } = usePreferences()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!showDemoData) return
+    if (!isHydrated || !showDemoData) {
+      setLoading(true)
+      return
+    }
+
     setLoading(true)
     const t = window.setTimeout(() => setLoading(false), delay)
     return () => window.clearTimeout(t)
-  }, [key, delay, showDemoData])
+  }, [isHydrated, key, delay, showDemoData])
 
+  if (!isHydrated) return 'loading'
   if (!showDemoData) return 'off'
   return loading ? 'loading' : 'ready'
 }

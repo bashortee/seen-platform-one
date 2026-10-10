@@ -25,7 +25,11 @@ import {
   type PerformanceRange,
 } from '@/data/demo'
 import { formatNumber } from '@/lib/cn'
-import { usePreferences } from '@/lib/preferences'
+
+import {
+  usePreferences,
+  usePreferencesHydrated,
+} from '@/lib/preferences'
 import { useDemoData } from '@/lib/useDemoData'
 import { ArtistProfiles } from '@/components/ArtistProfiles'
 
@@ -41,7 +45,9 @@ const roleIntro = {
 } as const
 
 function Dashboard() {
-  const { role, displayName } = usePreferences()
+ 
+const { role, displayName, showDemoData } = usePreferences()
+const isHydrated = usePreferencesHydrated()
   const [range, setRange] = useState<PerformanceRange>('14w')
   const status = useDemoData()
   const chartStatus = useDemoData(range, 350)
@@ -59,13 +65,33 @@ function Dashboard() {
           <ArtistProfiles />
       <PageHeader
         eyebrow={role ? roleIntro[role] : 'Dashboard'}
-        title={displayName ? `Good to see you, ${displayName.split(' ')[0]}.` : `${demoArtist.name}, this week.`}
-        description={
+        
+title={
+  !isHydrated
+    ? 'Loading your dashboard…'
+    : displayName
+      ? `Good to see you, ${displayName.split(' ')[0]}.`
+      : showDemoData
+        ? `${demoArtist.name}, this week.`
+        : 'Your dashboard'
+}
+        
+description={
+  !isHydrated
+    ? 'Loading your saved preferences…'
+    : showDemoData
+      ? (
           <>
-            Viewing <strong className="font-medium text-fg">{demoArtist.name}</strong>, a fictional demo artist.
-            All figures below are sample data to show how SEEN will present your own.
+            Viewing{' '}
+            <strong className="font-medium text-fg">
+              {demoArtist.name}
+            </strong>
+            , a fictional demo artist. All figures below are sample data to
+            show how SEEN will present your own.
           </>
-        }
+        )
+      : 'Your music workspace. Your dashboard will show your artist data here.'
+}
         actions={
           <Link to="/app/assistant" className={buttonClass('secondary', 'md')}>
             Ask SEEN about this week <ArrowRight className="h-4 w-4" aria-hidden />

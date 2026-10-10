@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { demoTasks, type Task } from '@/data/demo'
 
 /**
@@ -13,6 +13,7 @@ export interface Preferences {
   role: Role | null
   showDemoData: boolean
   displayName: string
+  selectedArtistId: string
   tasks: Task[]
 }
 
@@ -22,11 +23,23 @@ const defaults: Preferences = {
   role: null,
   showDemoData: true,
   displayName: '',
+  selectedArtistId: '',
   tasks: demoTasks,
 }
 
 let state: Preferences = defaults
 let hydrated = false
+export function usePreferencesHydrated() {
+  
+const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    hydrate()
+    setIsHydrated(true)
+  }, [])
+
+  return isHydrated
+}
 const listeners = new Set<() => void>()
 
 function hydrate() {
